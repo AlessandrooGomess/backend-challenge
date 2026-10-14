@@ -8,6 +8,7 @@ import { CompanyScopeModule } from './common/services/company-scope.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AbilityModule } from './modules/ability/ability.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CompaniesModule } from './modules/companies/companies.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { HealthModule } from './modules/health/health.module';
     CompanyScopeModule,
     AuthModule,
     HealthModule,
+    CompaniesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
