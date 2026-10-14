@@ -18,7 +18,8 @@ model Company {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
-  users User[] @relation(name: "CompanyToUser")
+  users    User[]    @relation(name: "CompanyToUser")
+  vehicles Vehicle[] @relation(name: "CompanyToVehicle")
 
   @@index([cnpj])
   @@map("company")
@@ -41,4 +42,25 @@ model User {
   @@index([companyId])
   @@index([email])
   @@map("user")
+}
+
+model Vehicle {
+  id          String    @id @default(cuid(2))
+  companyId   String    @map("company_id")
+  plate       String    @db.VarChar(7)
+  brand       String    @db.VarChar(50)
+  model       String    @db.VarChar(50)
+  year        Int
+  vehicleType String    @map("vehicle_type") @db.VarChar(20)
+  isActive    Boolean   @default(true) @map("is_active")
+  description String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  company Company @relation(name: "CompanyToVehicle", fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, plate])
+  @@map("vehicle")
 }

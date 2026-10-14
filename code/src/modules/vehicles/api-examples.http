@@ -1,0 +1,48 @@
+@baseUrl = http://localhost:3000
+@token = {{login.response.body.accessToken}}
+
+### Login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "gestor@transportes-alfa.com",
+  "password": "Senha@123"
+}
+
+### Criar veículo
+POST {{baseUrl}}/vehicles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "plate": "rio-2a45",
+  "brand": "Fiat",
+  "model": "Toro",
+  "year": 2024,
+  "vehicleType": "Carro",
+  "description": "Veículo da supervisão"
+}
+
+### Listar veículos
+GET {{baseUrl}}/vehicles?page=1&limit=10&search=fiat&vehicleType=Carro&vehicleType=Van&isActive=true&orderBy=plate&order=asc
+Authorization: Bearer {{token}}
+
+### Detalhar veículo
+GET {{baseUrl}}/vehicles/ID_DO_VEICULO
+Authorization: Bearer {{token}}
+
+### Atualizar veículo
+PATCH {{baseUrl}}/vehicles/ID_DO_VEICULO
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": false,
+  "description": "Em manutenção preventiva"
+}
+
+### Excluir veículo
+DELETE {{baseUrl}}/vehicles/ID_DO_VEICULO
+Authorization: Bearer {{token}}
