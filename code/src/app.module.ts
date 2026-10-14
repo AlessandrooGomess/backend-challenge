@@ -10,6 +10,7 @@ import { AbilityModule } from './modules/ability/ability.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { HealthModule } from './modules/health/health.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { HealthModule } from './modules/health/health.module';
     AuthModule,
     HealthModule,
     CompaniesModule,
+    UsersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AuthGuard },
