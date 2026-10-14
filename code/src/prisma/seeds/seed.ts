@@ -5,229 +5,89 @@ import { VehicleType } from '../../modules/vehicles/enums/vehicle-type.enum';
 
 const prisma = new PrismaClient();
 
-const DEFAULT_PASSWORD = 'Senha@123';
+const vehicle = (
+  plate: string,
+  brand: string,
+  model: string,
+  year: number,
+  vehicleType: VehicleType,
+) => ({
+  plate,
+  brand,
+  model,
+  year,
+  vehicleType,
+});
 
-async function clearDatabase() {
+async function main() {
   await prisma.vehicle.deleteMany();
   await prisma.user.deleteMany();
   await prisma.company.deleteMany();
-}
 
-async function seedCompanies() {
   const alfa = await prisma.company.create({
-    data: {
-      name: 'Transportes Alfa',
-      legalName: 'Transportes Alfa Ltda',
-      cnpj: '11222333000181',
-      phone: '81999990001',
-    },
+    data: { name: 'Transportes Alfa', legalName: 'Transportes Alfa Ltda', cnpj: '11222333000181' },
   });
-
   const beta = await prisma.company.create({
-    data: {
-      name: 'Logística Beta',
-      legalName: 'Logística Beta S.A.',
-      cnpj: '44555666000199',
-      phone: '81999990002',
-    },
+    data: { name: 'Logística Beta', legalName: 'Logística Beta S.A.', cnpj: '44555666000199' },
   });
 
-  return { alfa, beta };
-}
-
-async function seedUsers(companies: { alfa: { id: string }; beta: { id: string } }) {
-  const password = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-
-  const users = [
-    { name: 'Admin Motiron', email: 'admin@motiron.com', role: Role.ADMIN, companyId: null },
-    {
-      name: 'Gestor Alfa',
-      email: 'gestor@transportes-alfa.com',
-      role: Role.MANAGER,
-      companyId: companies.alfa.id,
-    },
-    {
-      name: 'Visualizador Alfa',
-      email: 'visualizacao@transportes-alfa.com',
-      role: Role.VIEWER,
-      companyId: companies.alfa.id,
-    },
-    {
-      name: 'Gestor Beta',
-      email: 'gestor@logistica-beta.com',
-      role: Role.MANAGER,
-      companyId: companies.beta.id,
-    },
-    {
-      name: 'Visualizador Beta',
-      email: 'visualizacao@logistica-beta.com',
-      role: Role.VIEWER,
-      companyId: companies.beta.id,
-    },
-    {
-      name: 'Motorista Inativo Alfa',
-      email: 'inativo@transportes-alfa.com',
-      role: Role.VIEWER,
-      companyId: companies.alfa.id,
-      isActive: false,
-    },
-  ];
-
+  const password = await bcrypt.hash('Senha@123', 10);
   await prisma.user.createMany({
-    data: users.map(user => ({ ...user, password })),
+    data: [
+      { name: 'Admin Motiron', email: 'admin@motiron.com', role: Role.ADMIN },
+      {
+        name: 'Gestor Alfa',
+        email: 'gestor@transportes-alfa.com',
+        role: Role.MANAGER,
+        companyId: alfa.id,
+      },
+      {
+        name: 'Visualizador Alfa',
+        email: 'visualizacao@transportes-alfa.com',
+        role: Role.VIEWER,
+        companyId: alfa.id,
+      },
+      {
+        name: 'Gestor Beta',
+        email: 'gestor@logistica-beta.com',
+        role: Role.MANAGER,
+        companyId: beta.id,
+      },
+      {
+        name: 'Visualizador Beta',
+        email: 'visualizacao@logistica-beta.com',
+        role: Role.VIEWER,
+        companyId: beta.id,
+      },
+    ].map(user => ({ ...user, password })),
   });
-}
 
-async function seedVehicles(companies: { alfa: { id: string }; beta: { id: string } }) {
-  const { alfa, beta } = companies;
-
+  const alfaVehicles = [
+    vehicle('ABC1D23', 'Fiat', 'Strada', 2022, VehicleType.CAR),
+    vehicle('BRA2E19', 'Volkswagen', 'Gol', 2019, VehicleType.CAR),
+    vehicle('QWE4567', 'Chevrolet', 'Onix', 2018, VehicleType.CAR),
+    vehicle('HND3F45', 'Honda', 'CG 160', 2023, VehicleType.MOTORCYCLE),
+    vehicle('YMH5G67', 'Yamaha', 'Factor 150', 2021, VehicleType.MOTORCYCLE),
+    vehicle('SCN1A11', 'Scania', 'R 450', 2020, VehicleType.TRUCK),
+    vehicle('VLV2B22', 'Volvo', 'FH 540', 2024, VehicleType.TRUCK),
+    { ...vehicle('SPR3C33', 'Mercedes-Benz', 'Sprinter', 2017, VehicleType.VAN), isActive: false },
+    { ...vehicle('DEL4D44', 'Renault', 'Kangoo', 2015, VehicleType.VAN), deletedAt: new Date() },
+  ];
+  const betaVehicles = [
+    vehicle('ABC1D23', 'Toyota', 'Hilux', 2023, VehicleType.CAR),
+    vehicle('JKL8901', 'Hyundai', 'HB20', 2020, VehicleType.CAR),
+    vehicle('MNO2H34', 'Renault', 'Master', 2022, VehicleType.VAN),
+    vehicle('FRD6J78', 'Ford', 'Transit', 2025, VehicleType.VAN),
+    { ...vehicle('IVC9K01', 'Iveco', 'Daily', 2016, VehicleType.TRUCK), isActive: false },
+    vehicle('BMW7L23', 'BMW', 'G 310 R', 2024, VehicleType.MOTORCYCLE),
+    vehicle('DAF4M56', 'DAF', 'XF 480', 2021, VehicleType.TRUCK),
+  ];
   await prisma.vehicle.createMany({
     data: [
-      {
-        companyId: alfa.id,
-        plate: 'ABC1D23',
-        brand: 'Fiat',
-        model: 'Strada',
-        year: 2022,
-        vehicleType: VehicleType.CAR,
-        description: 'Picape de apoio',
-      },
-      {
-        companyId: alfa.id,
-        plate: 'BRA2E19',
-        brand: 'Volkswagen',
-        model: 'Gol',
-        year: 2019,
-        vehicleType: VehicleType.CAR,
-      },
-      {
-        companyId: alfa.id,
-        plate: 'QWE4567',
-        brand: 'Chevrolet',
-        model: 'Onix',
-        year: 2018,
-        vehicleType: VehicleType.CAR,
-      },
-      {
-        companyId: alfa.id,
-        plate: 'HND3F45',
-        brand: 'Honda',
-        model: 'CG 160',
-        year: 2023,
-        vehicleType: VehicleType.MOTORCYCLE,
-        description: 'Entregas rápidas',
-      },
-      {
-        companyId: alfa.id,
-        plate: 'YMH5G67',
-        brand: 'Yamaha',
-        model: 'Factor 150',
-        year: 2021,
-        vehicleType: VehicleType.MOTORCYCLE,
-      },
-      {
-        companyId: alfa.id,
-        plate: 'SCN1A11',
-        brand: 'Scania',
-        model: 'R 450',
-        year: 2020,
-        vehicleType: VehicleType.TRUCK,
-        description: 'Cavalo mecânico',
-      },
-      {
-        companyId: alfa.id,
-        plate: 'VLV2B22',
-        brand: 'Volvo',
-        model: 'FH 540',
-        year: 2024,
-        vehicleType: VehicleType.TRUCK,
-      },
-      {
-        companyId: alfa.id,
-        plate: 'SPR3C33',
-        brand: 'Mercedes-Benz',
-        model: 'Sprinter',
-        year: 2017,
-        vehicleType: VehicleType.VAN,
-        isActive: false,
-        description: 'Em manutenção',
-      },
-      {
-        companyId: alfa.id,
-        plate: 'DEL4D44',
-        brand: 'Renault',
-        model: 'Kangoo',
-        year: 2015,
-        vehicleType: VehicleType.VAN,
-        deletedAt: new Date('2026-01-10T12:00:00Z'),
-      },
-      {
-        companyId: beta.id,
-        plate: 'ABC1D23',
-        brand: 'Toyota',
-        model: 'Hilux',
-        year: 2023,
-        vehicleType: VehicleType.CAR,
-      },
-      {
-        companyId: beta.id,
-        plate: 'JKL8901',
-        brand: 'Hyundai',
-        model: 'HB20',
-        year: 2020,
-        vehicleType: VehicleType.CAR,
-      },
-      {
-        companyId: beta.id,
-        plate: 'MNO2H34',
-        brand: 'Renault',
-        model: 'Master',
-        year: 2022,
-        vehicleType: VehicleType.VAN,
-      },
-      {
-        companyId: beta.id,
-        plate: 'FRD6J78',
-        brand: 'Ford',
-        model: 'Transit',
-        year: 2025,
-        vehicleType: VehicleType.VAN,
-      },
-      {
-        companyId: beta.id,
-        plate: 'IVC9K01',
-        brand: 'Iveco',
-        model: 'Daily',
-        year: 2016,
-        vehicleType: VehicleType.TRUCK,
-        isActive: false,
-      },
-      {
-        companyId: beta.id,
-        plate: 'BMW7L23',
-        brand: 'BMW',
-        model: 'G 310 R',
-        year: 2024,
-        vehicleType: VehicleType.MOTORCYCLE,
-      },
-      {
-        companyId: beta.id,
-        plate: 'DAF4M56',
-        brand: 'DAF',
-        model: 'XF 480',
-        year: 2021,
-        vehicleType: VehicleType.TRUCK,
-        description: 'Rota Recife–Salvador',
-      },
+      ...alfaVehicles.map(v => ({ ...v, companyId: alfa.id })),
+      ...betaVehicles.map(v => ({ ...v, companyId: beta.id })),
     ],
   });
-}
-
-async function main() {
-  await clearDatabase();
-  const companies = await seedCompanies();
-  await seedUsers(companies);
-  await seedVehicles(companies);
 
   console.log('Seed concluído com sucesso.');
 }

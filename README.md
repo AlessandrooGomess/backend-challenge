@@ -104,6 +104,7 @@ Todos com a senha **`Senha@123`**. Faça `POST /auth/login` e use o
 ```
 code/src/
 ├── main.ts / app.module.ts   # Bootstrap e registro dos módulos
+├── health.controller.ts      # GET /health
 ├── prisma/                   # schema.prisma, migrations, seed e PrismaService
 │
 ├── common/                   # Infra transversal
@@ -111,7 +112,7 @@ code/src/
 │   ├── guards/               # AuthGuard (JWT) e PoliciesGuard (CASL)
 │   ├── interfaces/           # AuthUser
 │   ├── filters/              # AllExceptionsFilter
-│   ├── services/             # CompanyScopeResolver
+│   ├── services/             # CompanyScopeResolver (registrar nos providers do módulo)
 │   └── dtos/                 # Paginação/ordenação compartilhadas
 │
 └── modules/                  # Módulos de domínio
