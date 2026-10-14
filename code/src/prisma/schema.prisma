@@ -1,0 +1,44 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Company {
+  id        String    @id @default(cuid(2))
+  name      String    @db.VarChar(150)
+  legalName String    @map("legal_name") @db.VarChar(200)
+  cnpj      String    @db.VarChar(14)
+  phone     String?   @db.VarChar(20)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  users User[] @relation(name: "CompanyToUser")
+
+  @@index([cnpj])
+  @@map("company")
+}
+
+model User {
+  id        String    @id @default(cuid(2))
+  companyId String?   @map("company_id")
+  name      String    @db.VarChar(100)
+  email     String    @db.VarChar(255)
+  password  String    @db.VarChar(255)
+  role      String    @db.VarChar(30)
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  company Company? @relation(name: "CompanyToUser", fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([email])
+  @@map("user")
+}
