@@ -20,7 +20,8 @@ export default tseslint.config(
       sourceType: 'module',
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: new URL('.', import.meta.url).pathname,
+         // Usa import.meta.dirname para compatibilidade do caminho absoluto também no Windows.
+        tsconfigRootDir: import.meta.dirname,
       },
     },
   },
