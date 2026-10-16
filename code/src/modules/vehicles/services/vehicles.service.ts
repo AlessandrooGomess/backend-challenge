@@ -7,6 +7,7 @@ import { AbilityFactory } from 'src/modules/ability/ability.factory';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVehicleDto } from '../dtos/create-vehicle.dto';
 import { QueryVehicleDto } from '../dtos/query-vehicle.dto';
+import { UpdateVehicleDto } from '../dtos/update-vehicle.dto';
 
 export const VEHICLE_SELECT = {
   id: true,
@@ -89,6 +90,35 @@ export class VehiclesService {
 
     return found;
   }
+
+  async update(
+    id: string,
+    data: UpdateVehicleDto,
+    user: AuthUser,
+  ): Promise<{ id: string; message: string }> {
+    const vehicle = await this.findOne(id, user);
+
+    if (data.plate) {
+      await this.ensurePlateIsAvailable(data.plate, vehicle.company.id, id);
+    }
+
+    await this.prisma.vehicle.update({
+      where: { id },
+      data,
+    });
+
+    return { id, message: 'Veículo atualizado com sucesso' };
+  }
+
+  async remove(id: string, user: AuthUser): Promise<void> {
+    await this.findOne(id, user);
+
+    await this.prisma.vehicle.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
   private async ensurePlateIsAvailable(
     plate: string,
     companyId: string,
