@@ -1,5 +1,11 @@
 import { accessibleBy } from '@casl/prisma';
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from 'src/common/interfaces/auth-user.interface';
 import { CompanyScopeResolver } from 'src/common/services/company-scope.resolver';
@@ -8,6 +14,9 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateVehicleDto } from '../dtos/create-vehicle.dto';
 import { QueryVehicleDto } from '../dtos/query-vehicle.dto';
 import { UpdateVehicleDto } from '../dtos/update-vehicle.dto';
+import { CreateRefuelingDto } from '../dtos/create-refueling.dto';
+import { QueryConsumptionDto } from '../dtos/query-consumption.dto';
+import { QueryRefuelingDto } from '../dtos/query-refueling.dto';
 
 export const VEHICLE_SELECT = {
   id: true,
@@ -22,6 +31,17 @@ export const VEHICLE_SELECT = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.VehicleSelect;
+
+const REFUELING_SELECT = {
+  id: true,
+  vehicleId: true,
+  date: true,
+  liters: true,
+  totalValue: true,
+  odometer: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.RefuelingSelect;
 
 @Injectable()
 export class VehiclesService {
@@ -119,6 +139,119 @@ export class VehiclesService {
     });
   }
 
+  async createRefueling(
+    vehicleId: string,
+    data: CreateRefuelingDto,
+    user: AuthUser,
+  ): Promise<{ id: string; message: string }> {
+    const vehicle = await this.findOne(vehicleId, user);
+
+    if (!vehicle.isActive) {
+      throw new BadRequestException(
+        'Não é possível registrar abastecimento para um veículo inativo',
+      );
+    }
+
+    await this.ensureValidOdometer(vehicleId, data.date, data.odometer);
+
+    const created = await this.prisma.refueling.create({
+      data: {
+        ...data,
+        vehicleId,
+      },
+      select: { id: true },
+    });
+
+    this.logger.log(`Refueling ${created.id} created for vehicle ${vehicleId}`);
+
+    return { id: created.id, message: 'Abastecimento registrado com sucesso' };
+  }
+
+  async findAllRefuelings(vehicleId: string, params: QueryRefuelingDto, user: AuthUser) {
+    await this.findOne(vehicleId, user);
+
+    const { page, limit, orderBy, order } = params;
+    const skip = (page - 1) * limit;
+
+    const ability = this.abilityFactory.createForUser(user);
+    const where: Prisma.RefuelingWhereInput = {
+      AND: [accessibleBy(ability, 'read').Refueling, { vehicleId }],
+    };
+
+    const [refuelings, total] = await Promise.all([
+      this.prisma.refueling.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [orderBy]: order },
+        select: REFUELING_SELECT,
+      }),
+      this.prisma.refueling.count({ where }),
+    ]);
+
+    return {
+      data: refuelings,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getConsumptionReport(vehicleId: string, query: QueryConsumptionDto, user: AuthUser) {
+    const vehicle = await this.findOne(vehicleId, user);
+
+    const start = new Date(`${query.startDate}T00:00:00.000Z`);
+    const end = new Date(`${query.endDate}T23:59:59.999Z`);
+
+    const refuelings = await this.prisma.refueling.findMany({
+      where: {
+        vehicleId,
+        date: { gte: start, lte: end },
+      },
+      orderBy: [{ date: 'asc' }, { odometer: 'asc' }],
+      select: {
+        liters: true,
+        totalValue: true,
+        odometer: true,
+      },
+    });
+
+    if (refuelings.length < 2) {
+      return {
+        vehicleId: vehicle.id,
+        plate: vehicle.plate,
+        period: { startDate: query.startDate, endDate: query.endDate },
+        totalKm: 0,
+        totalLiters: 0,
+        totalSpent: 0,
+        averageKmPerLiter: null,
+        averageCostPerKm: null,
+      };
+    }
+
+    const first = refuelings[0];
+    const last = refuelings[refuelings.length - 1];
+    const totalKm = last.odometer - first.odometer;
+
+    const subsequent = refuelings.slice(1);
+    const totalLiters = Number(subsequent.reduce((sum, r) => sum + r.liters, 0).toFixed(2));
+    const totalSpent = Number(subsequent.reduce((sum, r) => sum + r.totalValue, 0).toFixed(2));
+
+    return {
+      vehicleId: vehicle.id,
+      plate: vehicle.plate,
+      period: { startDate: query.startDate, endDate: query.endDate },
+      totalKm,
+      totalLiters,
+      totalSpent,
+      averageKmPerLiter: totalLiters > 0 ? Number((totalKm / totalLiters).toFixed(2)) : null,
+      averageCostPerKm: totalKm > 0 ? Number((totalSpent / totalKm).toFixed(2)) : null,
+    };
+  }
+
   private async ensurePlateIsAvailable(
     plate: string,
     companyId: string,
@@ -162,5 +295,36 @@ export class VehiclesService {
     }
 
     return where;
+  }
+
+  private async ensureValidOdometer(
+    vehicleId: string,
+    date: Date,
+    odometer: number,
+  ): Promise<void> {
+    const [previous, next] = await Promise.all([
+      this.prisma.refueling.findFirst({
+        where: { vehicleId, date: { lte: date } },
+        orderBy: [{ date: 'desc' }, { odometer: 'desc' }],
+        select: { odometer: true },
+      }),
+      this.prisma.refueling.findFirst({
+        where: { vehicleId, date: { gt: date } },
+        orderBy: [{ date: 'asc' }, { odometer: 'asc' }],
+        select: { odometer: true },
+      }),
+    ]);
+
+    if (previous && odometer <= previous.odometer) {
+      throw new BadRequestException(
+        `O hodômetro deve ser maior que o do abastecimento anterior (${previous.odometer} km)`,
+      );
+    }
+
+    if (next && odometer >= next.odometer) {
+      throw new BadRequestException(
+        `O hodômetro deve ser menor que o do abastecimento posterior (${next.odometer} km)`,
+      );
+    }
   }
 }

@@ -17,6 +17,9 @@ import { CreateVehicleDto } from '../dtos/create-vehicle.dto';
 import { QueryVehicleDto } from '../dtos/query-vehicle.dto';
 import { UpdateVehicleDto } from '../dtos/update-vehicle.dto';
 import { VehiclesService } from '../services/vehicles.service';
+import { CreateRefuelingDto } from '../dtos/create-refueling.dto';
+import { QueryConsumptionDto } from '../dtos/query-consumption.dto';
+import { QueryRefuelingDto } from '../dtos/query-refueling.dto';
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -51,6 +54,36 @@ export class VehiclesController {
     return this.vehiclesService.update(id, updateVehicleDto, user);
   }
 
+  @Can('create', 'Refueling')
+  @Post(':id/refuelings')
+  @HttpCode(HttpStatus.CREATED)
+  async createRefueling(
+    @Param('id') id: string,
+    @Body() createRefuelingDto: CreateRefuelingDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.vehiclesService.createRefueling(id, createRefuelingDto, user);
+  }
+
+  @Can('read', 'Refueling')
+  @Get(':id/refuelings')
+  async findAllRefuelings(
+    @Param('id') id: string,
+    @Query() query: QueryRefuelingDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.vehiclesService.findAllRefuelings(id, query, user);
+  }
+
+  @Can('read', 'Refueling')
+  @Get(':id/consumption')
+  async getConsumptionReport(
+    @Param('id') id: string,
+    @Query() query: QueryConsumptionDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.vehiclesService.getConsumptionReport(id, query, user);
+  }
   @Can('delete', 'Vehicle')
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)

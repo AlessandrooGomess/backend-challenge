@@ -49,3 +49,29 @@ Mensagens de validação e de erro em português.
 - Veículo de outra empresa → `404`.
 - `Visualização` não pode criar, editar nem excluir → `403`.
 - Soft delete: veículos excluídos não aparecem em nenhum endpoint.
+
+
+## Abastecimentos e Relatório de Consumo (Bônus)
+
+| Método | Rota | Descrição | Resposta |
+| --- | --- | --- | --- |
+| `POST` | `/vehicles/:id/refuelings` | Registra abastecimento (`date`, `liters`, `totalValue`, `odometer`) | `201` `{ id, message }` |
+| `GET` | `/vehicles/:id/refuelings` | Lista paginada de abastecimentos do veículo | `200` `{ data, meta }` |
+| `GET` | `/vehicles/:id/consumption` | Relatório de consumo no período (`startDate`, `endDate`) | `200` relatório |
+
+### Comportamento com menos de 2 abastecimentos no período
+
+Quando há **0 ou 1 abastecimento** no intervalo consultado (`startDate` a `endDate`), não há base suficiente para calcular a quilometragem percorrida nem a média de consumo. Nesse cenário, a API responde com status **`200 OK`** mantendo o contrato do relatório, com os totais zerados (`0`) e as médias como `null`:
+
+```json
+{
+  "vehicleId": "clx...",
+  "plate": "ABC1D23",
+  "period": { "startDate": "2026-01-01", "endDate": "2026-01-31" },
+  "totalKm": 0,
+  "totalLiters": 0,
+  "totalSpent": 0,
+  "averageKmPerLiter": null,
+  "averageCostPerKm": null
+}
+...
