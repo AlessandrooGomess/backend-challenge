@@ -74,4 +74,4 @@ Quando há **0 ou 1 abastecimento** no intervalo consultado (`startDate` a `endD
   "averageKmPerLiter": null,
   "averageCostPerKm": null
 }
-...
+```
