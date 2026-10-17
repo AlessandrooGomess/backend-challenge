@@ -1,11 +1,11 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Role } from 'src/common/enums/role.enum';
 import { AuthUser } from 'src/common/interfaces/auth-user.interface';
 import { VehicleType } from '../enums/vehicle-type.enum';
 import { VehiclesService } from './vehicles.service';
 
 jest.mock('@casl/prisma', () => ({
-  accessibleBy: jest.fn(() => ({ Vehicle: {} })),
+  accessibleBy: jest.fn(() => ({ Vehicle: {}, Refueling: {} })),
 }));
 
 describe('VehiclesService', () => {
@@ -17,6 +17,12 @@ describe('VehiclesService', () => {
       findMany: jest.Mock;
       count: jest.Mock;
       update: jest.Mock;
+    };
+    refueling: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
     };
   };
   let abilityFactory: { createForUser: jest.Mock };
@@ -42,6 +48,12 @@ describe('VehiclesService', () => {
         findMany: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+      },
+      refueling: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        count: jest.fn(),
       },
     };
     abilityFactory = { createForUser: jest.fn().mockReturnValue({ can: () => true }) };
@@ -156,6 +168,119 @@ describe('VehiclesService', () => {
       expect(prisma.vehicle.update).toHaveBeenCalledWith({
         where: { id: 'vehicle-1' },
         data: { deletedAt: expect.any(Date) },
+      });
+    });
+  });
+
+  describe('createRefueling', () => {
+    const refuelingDto = {
+      date: new Date('2026-01-15T10:00:00.000Z'),
+      liters: 40,
+      totalValue: 240,
+      odometer: 1500,
+    };
+
+    it('registra o abastecimento quando o veículo está ativo e o hodômetro é válido', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue({ id: 'vehicle-1', isActive: true });
+      prisma.refueling.findFirst
+        .mockResolvedValueOnce({ odometer: 1000 })
+        .mockResolvedValueOnce({ odometer: 2000 });
+      prisma.refueling.create.mockResolvedValue({ id: 'refueling-1' });
+
+      const result = await service.createRefueling('vehicle-1', refuelingDto, manager);
+
+      expect(result).toEqual({
+        id: 'refueling-1',
+        message: 'Abastecimento registrado com sucesso',
+      });
+      expect(prisma.refueling.create).toHaveBeenCalledWith({
+        data: { ...refuelingDto, vehicleId: 'vehicle-1' },
+        select: { id: true },
+      });
+    });
+
+    it('lança BadRequestException (400) quando o veículo está inativo', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue({ id: 'vehicle-1', isActive: false });
+
+      await expect(
+        service.createRefueling('vehicle-1', refuelingDto, manager),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.refueling.create).not.toHaveBeenCalled();
+    });
+
+    it('lança BadRequestException (400) quando o hodômetro não é maior que o do abastecimento anterior', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue({ id: 'vehicle-1', isActive: true });
+      prisma.refueling.findFirst
+        .mockResolvedValueOnce({ odometer: 1500 })
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.createRefueling('vehicle-1', refuelingDto, manager),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.refueling.create).not.toHaveBeenCalled();
+    });
+
+    it('lança BadRequestException (400) quando lançado no meio do histórico com hodômetro maior ou igual ao próximo', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue({ id: 'vehicle-1', isActive: true });
+      prisma.refueling.findFirst
+        .mockResolvedValueOnce({ odometer: 1000 })
+        .mockResolvedValueOnce({ odometer: 1400 });
+
+      await expect(
+        service.createRefueling('vehicle-1', refuelingDto, manager),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.refueling.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getConsumptionReport', () => {
+    it('calcula totalKm, totalLiters, totalSpent e médias ignorando os litros e valor do primeiro abastecimento', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue({ id: 'vehicle-1', plate: 'ABC1D23' });
+      prisma.refueling.findMany.mockResolvedValue([
+        { odometer: 10000, liters: 50, totalValue: 300 },
+        { odometer: 10600, liters: 50, totalValue: 310.25 },
+        { odometer: 11200, liters: 50, totalValue: 310.25 },
+      ]);
+
+      const result = await service.getConsumptionReport(
+        'vehicle-1',
+        { startDate: '2026-01-01', endDate: '2026-01-31' },
+        manager,
+      );
+
+      expect(result).toEqual({
+        vehicleId: 'vehicle-1',
+        plate: 'ABC1D23',
+        period: { startDate: '2026-01-01', endDate: '2026-01-31' },
+        totalKm: 1200,
+        totalLiters: 100,
+        totalSpent: 620.5,
+        averageKmPerLiter: 12,
+        averageCostPerKm: 0.52,
+      });
+    });
+
+    it('retorna totais zerados e médias nulas quando há menos de dois abastecimentos no período', async () => {
+      prisma.vehicle.findFirst.mockResolvedValue({ id: 'vehicle-1', plate: 'ABC1D23' });
+      prisma.refueling.findMany.mockResolvedValue([
+        { odometer: 10000, liters: 50, totalValue: 300 },
+      ]);
+
+      const result = await service.getConsumptionReport(
+        'vehicle-1',
+        { startDate: '2026-01-01', endDate: '2026-01-31' },
+        manager,
+      );
+
+      expect(result).toEqual({
+        vehicleId: 'vehicle-1',
+        plate: 'ABC1D23',
+        period: { startDate: '2026-01-01', endDate: '2026-01-31' },
+        totalKm: 0,
+        totalLiters: 0,
+        totalSpent: 0,
+        averageKmPerLiter: null,
+        averageCostPerKm: null,
       });
     });
   });
